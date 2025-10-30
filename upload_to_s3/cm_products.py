@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import io
 import oracledb
 import boto3
 from dotenv import load_dotenv
@@ -23,22 +24,27 @@ def get_connection():
     return conn
 
 
-def get_s3_client():
-    """Return boto3 S3 client using environment credentials."""
-    aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-    aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-    region = os.getenv("AWS_REGION", "ap-south-1")
-
-    s3 = boto3.client(
+def upload_to_s3(df, bucket_name, s3_key):
+    """Upload DataFrame as CSV directly to S3."""
+    s3_client = boto3.client(
         "s3",
-        aws_access_key_id=aws_access_key,
-        aws_secret_access_key=aws_secret_key,
-        region_name=region
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_REGION", "ap-south-1")
     )
-    return s3
+
+    # Convert DataFrame to in-memory CSV
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    csv_buffer.seek(0)
+
+    # Upload directly to S3
+    s3_client.put_object(Bucket=bucket_name, Key=s3_key, Body=csv_buffer.getvalue())
+    print(f"✅ {s3_key} uploaded successfully to S3 bucket: {bucket_name}")
 
 
 def cm_products():
+    """Extract products data from Oracle and upload to S3."""
     print("Connecting to Oracle...")
     conn = get_connection()
 
@@ -59,23 +65,13 @@ def cm_products():
     df = pd.read_sql(query, conn)
     print(f"Fetched {len(df)} rows from {SCHEMA}.{TABLE}")
 
-    # Save CSV temporarily before upload
-    temp_csv = f"/tmp/{TABLE}.csv"
-    df.to_csv(temp_csv, index=False)
-
-    # Upload to S3
-    s3 = get_s3_client()
+    # Upload directly to S3
     bucket_name = os.getenv("S3_BUCKET_NAME")
     s3_key = f"{TABLE}.csv"
-
-    s3.upload_file(temp_csv, bucket_name, s3_key)
-
-    print(f"✅ {TABLE}.csv uploaded successfully to s3://{bucket_name}/{s3_key}")
-
-    # Clean up local file
-    os.remove(temp_csv)
+    upload_to_s3(df, bucket_name, s3_key)
 
     conn.close()
+    print("Oracle connection closed.")
 
 
 if __name__ == "__main__":
