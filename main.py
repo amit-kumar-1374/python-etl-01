@@ -1,21 +1,17 @@
 import subprocess
+from dotenv import load_dotenv
+import os
 
-scripts = [
-    "cm_customers.py",
-    "cm_employees.py",
-    "cm_offices.py",
-    "cm_orders.py",
-    "cm_orderdetails.py",
-    "cm_payments.py",
-    "cm_products.py",
-    "cm_productlines.py"
-]
+load_dotenv()
+
+scripts = os.getenv("scripts").split(",")
 
 def main():
     for script in scripts:
-        print(f" Running {script} ...")
+        script = script.strip()   
+        print(f"Running {script} ...")
         subprocess.run(["python", script])
-    print("\n All tables downloaded successfully!")
+    print("\nAll tables downloaded successfully!")
 
 if __name__ == "__main__":
     main()
