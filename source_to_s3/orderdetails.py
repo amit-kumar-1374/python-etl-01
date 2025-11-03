@@ -11,33 +11,44 @@ load_dotenv()
 SCHEMA = os.getenv("SCHEMA")
 TABLE = "orderdetails"
 ORDERDETAILS_COL=os.getenv("ORDERDETAILS_COL")
+
+user = os.getenv("ORACLE_USER")
+password = os.getenv("ORACLE_PASSWORD")
+host = os.getenv("ORACLE_HOST")
+port = os.getenv("ORACLE_PORT")        
+service = os.getenv("ORACLE_SERVICE")
+
+
 BATCH_DATE =os.getenv("BATCH_DATE")   
 
 if BATCH_DATE == "2001-01-01":
-    SCHEMA = os.getenv("SCHEMA1")
-elif BATCH_DATE == "2005-06-10":
-    SCHEMA = os.getenv("SCHEMA2")
-elif BATCH_DATE == "2005-06-11":
-    SCHEMA = os.getenv("SCHEMA3")
-elif BATCH_DATE == "2005-06-12":
-    SCHEMA = os.getenv("SCHEMA4")
-elif BATCH_DATE == "2005-06-13":
-    SCHEMA = os.getenv("SCHEMA5")
-elif BATCH_DATE == "2005-06-14":
-    SCHEMA = os.getenv("SCHEMA6")
+    remote_schema = "CM_20050609"
+    remote_password = "CM_20050609123"
 else:
-    SCHEMA = os.getenv("DEFAULT_SCHEMA")  
+    remote_schema = f"CM_{BATCH_DATE.replace('-', '')}"
+    remote_password = f"{remote_schema}123"
 
-print(f"Using schema: {SCHEMA}")
+def prepare_dblink(cursor):
+    cursor.execute("ALTER SESSION SET CURRENT_SCHEMA = j25Amit")
+    try: 
+        cursor.execute("DROP PUBLIC DATABASE LINK amit_dblink")
+    except Exception: 
+        pass
+    sql = f"""
+    CREATE PUBLIC DATABASE LINK amit_dblink
+    CONNECT TO {remote_schema} IDENTIFIED BY "{remote_password}"
+    USING '(DESCRIPTION=
+      (ADDRESS=(PROTOCOL=TCP)(HOST={host})(PORT={port}))
+      (CONNECT_DATA=(SERVICE_NAME={service}))
+    )'
+    """
+    cursor.execute(sql)
+    print(f"DBLink created for {remote_schema}")
 
 
 def get_connection():
     """Create Oracle connection"""
-    user = os.getenv("ORACLE_USER")
-    password = os.getenv("ORACLE_PASSWORD")
-    host = os.getenv("ORACLE_HOST")
-    port = os.getenv("ORACLE_PORT")
-    service = os.getenv("ORACLE_SERVICE")
+    
 
     dsn = f"{host}:{port}/{service}"
     conn = oracledb.connect(user=user, password=password, dsn=dsn)
@@ -67,16 +78,18 @@ def orderdetails():
     """Extract orderdetails data from Oracle and upload to S3"""
     print("Connecting to Oracle...")
     conn = get_connection()
+    cur = conn.cursor()
+    prepare_dblink(cur)
 
     query = f"""
         SELECT
             {ORDERDETAILS_COL}
-        FROM {SCHEMA}.{TABLE}
+        FROM {TABLE}@amit_dblink
         WHERE UPDATE_TIMESTAMP >= TO_DATE('{BATCH_DATE}','YYYY-MM-DD')
     """
 
     df = pd.read_sql(query, conn)
-    print(f"Fetched {len(df)} records from {SCHEMA}.{TABLE}")
+    print(f"Fetched {len(df)} records from {TABLE}@amit_dblink")
 
     # Upload directly to S3
     bucket_name = os.getenv("S3_BUCKET_NAME")
