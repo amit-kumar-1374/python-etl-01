@@ -7,9 +7,30 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-
+PRODUCTLINES_COL= os.getenv("PRODUCTLINES_COL")
 SCHEMA = os.getenv("SCHEMA")
-TABLE = "products"
+TABLE = "productlines"
+
+
+BATCH_DATE =os.getenv("BATCH_DATE")  # Example input
+
+if BATCH_DATE == "2001-01-01":
+    SCHEMA = os.getenv("SCHEMA1")
+elif BATCH_DATE == "2005-06-10":
+    SCHEMA = os.getenv("SCHEMA2")
+elif BATCH_DATE == "2005-06-11":
+    SCHEMA = os.getenv("SCHEMA3")
+elif BATCH_DATE == "2005-06-12":
+    SCHEMA = os.getenv("SCHEMA4")
+elif BATCH_DATE == "2005-06-13":
+    SCHEMA = os.getenv("SCHEMA5")
+elif BATCH_DATE == "2005-06-14":
+    SCHEMA = os.getenv("SCHEMA6")
+else:
+    SCHEMA = os.getenv("DEFAULT_SCHEMA")  
+
+print(f"Using schema: {SCHEMA}")
+
 
 def get_connection():
     """Create Oracle DB connection using environment variables."""
@@ -26,12 +47,13 @@ def get_connection():
 
 def upload_to_s3(df, bucket_name, s3_key):
     """Upload DataFrame as CSV directly to S3."""
-    s3_client = boto3.client(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION", "ap-south-1")
-    )
+    # s3_client = boto3.client(
+    #     "s3",
+    #     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    #     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    #     region_name=os.getenv("AWS_REGION", "ap-south-1")
+    # )
+    s3_client = boto3.client("s3")
 
     # Convert DataFrame to in-memory CSV
     csv_buffer = io.StringIO()
@@ -43,31 +65,24 @@ def upload_to_s3(df, bucket_name, s3_key):
     print(f"✅ {s3_key} uploaded successfully to S3 bucket: {bucket_name}")
 
 
-def cm_products():
-    """Extract products data from Oracle and upload to S3."""
+def productlines():
+    """Extract productlines data from Oracle and upload to S3."""
     print("Connecting to Oracle...")
     conn = get_connection()
 
     query = f"""
         SELECT
-            PRODUCTCODE,
-            PRODUCTNAME,
-            PRODUCTLINE,
-            PRODUCTSCALE,
-            PRODUCTVENDOR,
-            PRODUCTDESCRIPTION,
-            QUANTITYINSTOCK,
-            BUYPRICE,
-            MSRP
+            {PRODUCTLINES_COL}
         FROM {SCHEMA}.{TABLE}
-    """
+        WHERE UPDATE_TIMESTAMP >= TO_DATE('{BATCH_DATE}','YYYY-MM-DD')
+        """
 
     df = pd.read_sql(query, conn)
     print(f"Fetched {len(df)} rows from {SCHEMA}.{TABLE}")
 
     # Upload directly to S3
     bucket_name = os.getenv("S3_BUCKET_NAME")
-    s3_key = f"{TABLE}.csv"
+    s3_key = f"{TABLE.upper()}/{BATCH_DATE}/{TABLE}.csv"
     upload_to_s3(df, bucket_name, s3_key)
 
     conn.close()
@@ -75,4 +90,4 @@ def cm_products():
 
 
 if __name__ == "__main__":
-    cm_products()
+    productlines()

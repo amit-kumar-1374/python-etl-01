@@ -10,6 +10,26 @@ load_dotenv()
 
 SCHEMA = os.getenv("SCHEMA")
 TABLE = "offices"
+OFFICES_COL = os.getenv("OFFICES_COL")
+BATCH_DATE =os.getenv("BATCH_DATE")  # Example input
+
+if BATCH_DATE == "2001-01-01":
+    SCHEMA = os.getenv("SCHEMA1")
+elif BATCH_DATE == "2005-06-10":
+    SCHEMA = os.getenv("SCHEMA2")
+elif BATCH_DATE == "2005-06-11":
+    SCHEMA = os.getenv("SCHEMA3")
+elif BATCH_DATE == "2005-06-12":
+    SCHEMA = os.getenv("SCHEMA4")
+elif BATCH_DATE == "2005-06-13":
+    SCHEMA = os.getenv("SCHEMA5")
+elif BATCH_DATE == "2005-06-14":
+    SCHEMA = os.getenv("SCHEMA6")
+else:
+    SCHEMA = os.getenv("DEFAULT_SCHEMA")  
+
+print(f"Using schema: {SCHEMA}")
+
 
 def get_connection():
     """Connect to Oracle"""
@@ -26,12 +46,13 @@ def get_connection():
 
 def upload_to_s3(df, bucket_name, s3_key):
     """Upload dataframe to S3 as CSV"""
-    s3_client = boto3.client(
-        's3',
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION")
-    )
+    # s3_client = boto3.client(
+    #     's3',
+    #     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    #     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    #     region_name=os.getenv("AWS_REGION")
+    # )
+    s3_client = boto3.client("s3")
 
     # Convert DataFrame to CSV in memory
     csv_buffer = io.StringIO()
@@ -43,23 +64,16 @@ def upload_to_s3(df, bucket_name, s3_key):
     print(f"✅ Successfully uploaded {s3_key} to S3 bucket '{bucket_name}'")
 
 
-def cm_offices():
+def offices():
     """Extract data from Oracle and upload to S3"""
     print("Connecting to Oracle...")
     conn = get_connection()
 
     query = f"""
         SELECT 
-            OFFICECODE,
-            CITY,
-            PHONE,
-            ADDRESSLINE1,
-            ADDRESSLINE2,
-            STATE,
-            COUNTRY,
-            POSTALCODE,
-            TERRITORY
+            {OFFICES_COL}
         FROM {SCHEMA}.{TABLE}
+        WHERE UPDATE_TIMESTAMP >= TO_DATE('{BATCH_DATE}','YYYY-MM-DD')
     """
 
     df = pd.read_sql(query, conn)
@@ -67,7 +81,7 @@ def cm_offices():
 
     # Upload to S3
     bucket_name = os.getenv("S3_BUCKET_NAME")
-    s3_key = f"{TABLE}.csv"
+    s3_key = f"{TABLE.upper()}/{BATCH_DATE}/{TABLE}.csv"
     upload_to_s3(df, bucket_name, s3_key)
 
     conn.close()
@@ -75,4 +89,4 @@ def cm_offices():
 
 
 if __name__ == "__main__":
-    cm_offices()
+    offices()
