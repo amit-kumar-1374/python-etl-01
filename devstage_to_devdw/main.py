@@ -5,12 +5,12 @@ import sys
 
 load_dotenv()
 
-# Get current folder of this script
+# Get folder of this script
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Load scripts and make full paths relative to this folder
-scripts = os.getenv("scripts", "").split(",")
-scripts = [os.path.join(base_dir, s.strip()) for s in scripts]
+# Load scripts from .env and make full paths
+all_scripts = os.getenv("all_scripts", "").split(",")
+all_scripts = [os.path.join(base_dir, s.strip()) for s in all_scripts]
 
 # ==========================
 # Status functions
@@ -30,11 +30,11 @@ def mark_failed(script_name, error=None):
 # Main function
 # ==========================
 def main():
-    if not scripts:
-        print("No scripts defined in .env file")
+    if not all_scripts:
+        print("No scripts defined in .env")
         return
 
-    for script in scripts:
+    for script in all_scripts:
         mark_start(script)
         if not os.path.exists(script):
             mark_failed(script, "Script not found")
@@ -48,7 +48,7 @@ def main():
             mark_failed(script, e.stderr)
             raise RuntimeError(f"{script} failed") from e
 
-    print("\nAll source_to_s3 scripts completed successfully!")
+    print("\nAll tables downloaded successfully!")
 
 if __name__ == "__main__":
     main()
