@@ -1,0 +1,38 @@
+version: 2
+
+sources:
+  - name: stage
+    schema: j25amit_devstage
+    tables:
+      - name: customers
+      - name: employees
+      - name: orders
+      - name: orderdetails
+      - name: products
+      - name: payments
+      - name: productlines
+      - name: offices 
+
+  - name: metadata
+    schema: j25amit_etl_metadata
+    tables:
+      - name: batch_control
+
+  - name: j25amit_devdw          # <-- new source for devdw
+    schema: j25amit_devdw
+    tables:
+      - name: customers
+      - name: customer_history
+      - name: employees      # if needed
+      - name: products
+      - name: product_history
+      - name: orders
+      - name: orderdetails
+      - name: daily_customer_summary
+      - name: payments
+
+      - name: monthly_customer_summary
+      - name: daily_product_summary
+      - name: monthly_product_summary
+      
+
